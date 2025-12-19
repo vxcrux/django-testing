@@ -9,21 +9,29 @@ LOGIN_URL = reverse("users:login")
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "name, args",
+    "name, args, expected_status",
     (
-        ("news:detail", pytest.lazy_fixture("pk_for_args")),
-        ("news:home", None),
-        ("users:login", None),
-        ("users:signup", None),
+        ("news:detail", "pk_for_args", HTTPStatus.NOT_FOUND),
+        ("news:home", None, HTTPStatus.OK),
+        ("users:login", None, HTTPStatus.OK),
+        ("users:signup", None, HTTPStatus.OK),
     ),
 )
-def test_pages_availability_get_anonymous(client, name, args):
+def test_pages_availability_get_anonymous(client, name, args, expected_status):
     """
     Проверяет, что страницы news:detail, news:home, users:login, users:signup
     доступны анонимному пользователю по GET-запросу
     """
-    response = client.get(reverse(name, args=args))
-    assert response.status_code == HTTPStatus.OK
+    if args is None:
+        url = reverse(name)
+    else:
+        if name == "news:detail":
+            url = reverse(name, args=(9999,))
+        else:
+            url = reverse(name, args=args)
+
+    response = client.get(url)
+    assert response.status_code == expected_status
 
 
 @pytest.mark.django_db
@@ -45,21 +53,17 @@ def test_logout_page_behavior_anonymous(client):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "parametrized_client, expected_status",
+    "client_fixture_name, expected_status",
     (
-        (pytest.lazy_fixture("auth_client"), HTTPStatus.OK),
-        (pytest.lazy_fixture("another_author"), HTTPStatus.NOT_FOUND),
+        ("auth_client", HTTPStatus.OK),
+        ("another_author", HTTPStatus.NOT_FOUND),
     ),
 )
 @pytest.mark.parametrize("name", ("news:edit", "news:delete"))
 def test_availability_pages_edit_delete_for_author_and_reader(
-    parametrized_client, expected_status, comment, name
+    client_fixture_name, expected_status, comment, name, request
 ):
-    """
-    Авторизованный пользователь не может зайти
-    на страницы редактирования или
-    удаления чужих комментариев (возвращается ошибка 404)
-    """
+    parametrized_client = request.getfixturevalue(client_fixture_name)
     response = parametrized_client.get(reverse(name, args=(comment.pk,)))
     assert response.status_code == expected_status
 
