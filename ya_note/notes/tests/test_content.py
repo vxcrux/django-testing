@@ -1,51 +1,98 @@
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from notes.constance import NOTES_LIST
+from django.urls import reverse
+from http import HTTPStatus
+
 from notes.forms import NoteForm
 from notes.models import Note, User
-from .test_logic import AUTHOR, SLUG, TEXT, TITLE, USER
+
+
+NOTES_LIST_URL = reverse('notes:list')
 
 
 class TestContent(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.author = User.objects.create(username=AUTHOR)
-        cls.reader = User.objects.create(username=USER)
-        cls.user_client = Client()
-        cls.user_client.force_login(cls.author)
+        cls.author = User.objects.create(username='Я')
+        cls.reader = User.objects.create(username='Читатель')
+
         cls.note = Note.objects.create(
-            title=TITLE,
-            text=TEXT,
-            author=cls.author,
-            slug=SLUG,
+            title='Заголовок',
+            text='Текст',
+            slug='slug',
+            author=cls.author
         )
 
-    def test_notes_count(self):
+    def test_notes_list_count(self):
         """
-        Отдельная заметка передаётся на страницу со списком заметок
-        в списке object_list в словаре context
+        Проверяет что на странице списка заметок передается одна заметка
+        созданная автором и что этот список принадлежит автору
         """
-        response = self.user_client.get(NOTES_LIST)
-        notes_count = response.context["object_list"].count()
-        self.assertEqual(notes_count, 1)
+        if not hasattr(self, 'user_client'):
+            self.user_client = Client()
+            self.user_client.force_login(self.author)
+
+        response = self.user_client.get(NOTES_LIST_URL)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertIn('object_list', response.context)
+        object_list = response.context['object_list']
+        self.assertEqual(
+            object_list.count(), 1, 'Ожидалась одна заметка в списке'
+        )
+        self.assertEqual(
+            object_list.first().author, self.author,
+            'Заметка в списке должна принадлежать автору'
+        )
 
     def test_note_not_in_list_for_another_user(self):
         """
-        В список заметок одного пользователя
-        не попадают заметки другого пользователя
+        Проверяет что при входе под другим пользователем
+        в списке заметок нет ни одной записи
         """
-        self.user_client.force_login(self.reader)
-        response = self.user_client.get(NOTES_LIST)
-        notes_count = response.context["object_list"].count()
-        self.assertEqual(notes_count, 0)
+        reader_client = Client()
+        reader_client.force_login(self.reader)
 
-    def test_authorized_client_has_form(self):
-        """На страницы создания и редактирования заметки передаются формы"""
-        urls = (("notes:add", None), ("notes:edit", (self.note.slug,)))
-        for url, args in urls:
-            with self.subTest(url=url):
-                response = self.user_client.get(reverse(url, args=args))
-                self.assertIn("form", response.context)
-                self.assertIsInstance(response.context["form"], NoteForm)
+        response = reader_client.get(NOTES_LIST_URL)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertIn('object_list', response.context)
+        object_list = response.context['object_list']
+        self.assertEqual(
+            object_list.count(), 0,
+            'Ожидалось 0 заметок для другого пользователя'
+        )
+
+    def test_add_edit_pages_have_form(self):
+        """
+        Проверяет что на страницы добавления и редактирования заметки
+        передаются формы NoteForm в контексте
+        """
+        urls_to_check = (
+            ('notes:add', None),
+            ('notes:edit', (self.note.slug,)),
+        )
+
+        if not hasattr(self, 'user_client'):
+            self.user_client = Client()
+            self.user_client.force_login(self.author)
+
+        for url_name, url_args in urls_to_check:
+            with self.subTest(url_name=url_name, url_args=url_args):
+                if url_args:
+                    current_url = reverse(url_name, args=url_args)
+                else:
+                    current_url = reverse(url_name)
+
+                response = self.user_client.get(current_url)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                self.assertIn(
+                    'form',
+                    response.context,
+                    (f"Форма 'form' отсутствует в контексте для {url_name}")
+                )
+                self.assertIsInstance(
+                    response.context['form'],
+                    NoteForm,
+                    (f"Переданный 'form' не явл. экз. NoteForm для {url_name}")
+                )

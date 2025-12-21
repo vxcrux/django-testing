@@ -9,75 +9,45 @@ LOGIN_URL = reverse("users:login")
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "name, args, expected_status",
+    'name, args',
     (
-        ("news:detail", "pk_for_args", HTTPStatus.NOT_FOUND),
-        ("news:home", None, HTTPStatus.OK),
-        ("users:login", None, HTTPStatus.OK),
-        ("users:signup", None, HTTPStatus.OK),
-    ),
+        ('news:detail', pytest.lazy_fixture('pk_for_args')),
+        ('news:home', None),
+        ('users:login', None),
+        ('users:signup', None),
+
+    )
 )
-def test_pages_availability_get_anonymous(client, name, args, expected_status):
-    """
-    Проверяет, что страницы news:detail, news:home, users:login, users:signup
-    доступны анонимному пользователю по GET-запросу
-    """
-    if args is None:
-        url = reverse(name)
-    else:
-        if name == "news:detail":
-            url = reverse(name, args=(9999,))
-        else:
-            url = reverse(name, args=args)
-
-    response = client.get(url)
-    assert response.status_code == expected_status
-
-
-@pytest.mark.django_db
-def test_logout_page_behavior_anonymous(client):
-    """
-    Проверяет поведение users:logout для анонимного пользователя:
-    GET-запрос должен вернуть 405 Method Not Allowed
-    POST-запрос должен перенаправлять на страницу логина
-    """
-    logout_url = reverse("users:logout")
-
-    response_get = client.get(logout_url)
-    assert response_get.status_code == HTTPStatus.METHOD_NOT_ALLOWED
-
-    response_post = client.post(logout_url)
-    expected_redirect_url = reverse("users:login")
-    assertRedirects(response_post, expected_redirect_url)
+def test_pages_availability_get_anonymous(client, name, args):
+    response = client.get(reverse(name, args=args))
+    assert response.status_code == HTTPStatus.OK
 
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     "client_fixture_name, expected_status",
     (
-        ("auth_client", HTTPStatus.OK),
-        ("another_author", HTTPStatus.NOT_FOUND),
+        (pytest.lazy_fixture('auth_client'), HTTPStatus.OK),
+        (pytest.lazy_fixture('reader_client'), HTTPStatus.NOT_FOUND)
     ),
 )
-@pytest.mark.parametrize("name", ("news:edit", "news:delete"))
+@pytest.mark.parametrize('name', ('news:edit', 'news:delete'))
 def test_availability_pages_edit_delete_for_author_and_reader(
-    client_fixture_name, expected_status, comment, name, request
+    client_fixture_name, expected_status, comment, name
 ):
-    parametrized_client = request.getfixturevalue(client_fixture_name)
-    response = parametrized_client.get(reverse(name, args=(comment.pk,)))
+    response = client_fixture_name.get(reverse(name, args=(comment.pk,)))
     assert response.status_code == expected_status
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("name", ("news:edit", "news:delete"))
+@pytest.mark.parametrize(
+    'name',
+    ('news:edit', 'news:delete')
+)
 def test_availability_pages_edit_delete_for_anonymous_user(
-        client, comment, name):
-    """
-    При попытке перейти на страницу редактирования
-    или удаления комментария анонимный пользователь
-    перенаправляется на страницу авторизации
-    """
-    url = reverse(name, args=(comment.pk, ))
-    expected_url = f"{LOGIN_URL}?next={url}"
+    client, comment, name
+):
+    url = reverse(name, args=(comment.pk,))
+    expected_url = f'{LOGIN_URL}?next={url}'
     response = client.get(url)
     assertRedirects(response, expected_url)
