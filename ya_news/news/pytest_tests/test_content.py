@@ -1,16 +1,7 @@
-# Ваш файл: news/pytest_tests/test_content.py
-
 import pytest
 from django.conf import settings
-from django.urls import reverse
 
 from news.forms import CommentForm
-
-
-@pytest.fixture
-def home_url():
-    """Фикстура для URL главной страницы"""
-    return reverse("news:home")
 
 
 @pytest.mark.django_db

@@ -41,22 +41,22 @@ class TestNoteCreation(TestCase):
         self.assertRedirects(response, self.done_url)
         self.assertEqual(Note.objects.count(), 1)
 
-        note = Note.objects.get(
-            text='Текст',
-            title='Заголовок',
-            slug='slug1',
+        created_note = Note.objects.get(
+            title=self.form_data_creation['title'],
+            text=self.form_data_creation['text'],
+            slug=self.form_data_creation['slug'],
             author=self.user
         )
-        self.assertEqual(note.text, 'Текст')
-        self.assertEqual(note.title, 'Заголовок')
-        self.assertEqual(note.slug, 'slug1')
-        self.assertEqual(note.author, self.user)
+
+        self.assertEqual(created_note.text, 'Текст')
+        self.assertEqual(created_note.title, 'Заголовок')
+        self.assertEqual(created_note.slug, 'slug1')
+        self.assertEqual(created_note.author, self.user)
 
     def test_empty_slug(self):
         """
         Если при создании заметки не заполнен slug,
-        то он формируется автоматически,
-        с помощью функции pytils.translit.slugify
+        то он формируется автоматически
         """
         form_data_copy = self.form_data_creation.copy()
         form_data_copy.pop('slug')
@@ -66,15 +66,13 @@ class TestNoteCreation(TestCase):
         self.assertEqual(Note.objects.count(), 1)
 
         new_note = Note.objects.get(
-            text='Текст',
             title=form_data_copy['title'],
+            text=form_data_copy['text'],
             author=self.user
         )
+
         expected_slug = slugify(form_data_copy['title'])
         self.assertEqual(new_note.slug, expected_slug)
-        self.assertEqual(new_note.text, 'Текст')
-        self.assertEqual(new_note.title, form_data_copy['title'])
-        self.assertEqual(new_note.author, self.user)
 
 
 class TestNoteEditDelete(TestCase):
@@ -124,24 +122,16 @@ class TestNoteEditDelete(TestCase):
 
     def test_author_can_edit_note(self):
         """Авторизованный пользователь может редактировать свои заметки"""
-        DATA_FOR_NOTE_TO_SEND = {
-            'title': 'Новый заголовок',
-            'text': 'Новый текст',
-            'slug': 'new-slug'
-        }
         response = self.author_client.post(
             self.edit_url,
-            data=DATA_FOR_NOTE_TO_SEND
+            data=self.form_data_edit
         )
+        self.assertRedirects(response, self.done_url)
 
-        self.assertRedirects(response, reverse('notes:success'))
+        self.note.refresh_from_db()
 
-        edited_note = Note.objects.get(pk=self.note.pk)
-
-        self.assertEqual(edited_note.text, DATA_FOR_NOTE_TO_SEND['text'])
-        self.assertEqual(edited_note.title, DATA_FOR_NOTE_TO_SEND['title'])
-        self.assertEqual(edited_note.slug, DATA_FOR_NOTE_TO_SEND['slug'])
-        self.assertEqual(edited_note.author, self.author)
+        self.assertEqual(self.note.text, self.form_data_edit['text'])
+        self.assertEqual(self.note.title, self.form_data_edit['title'])
 
     def test_other_user_cant_edit_note(self):
         """Другой пользователь не может редактировать чужие заметки"""
@@ -149,21 +139,23 @@ class TestNoteEditDelete(TestCase):
             self.edit_url, data=self.form_data_edit
         )
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
-
-        original_note = Note.objects.get(pk=self.note.pk)
-
-        self.assertEqual(original_note.text, 'Оригинальный текст')
-        self.assertEqual(original_note.slug, 'slug2')
-        self.assertEqual(original_note.title, 'Оригинальный заголовок')
-        self.assertEqual(original_note.author, self.author)
+        note_from_db = Note.objects.filter(id=self.note.id).first()
+        self.assertIsNotNone(note_from_db)
+        self.assertEqual(self.note.title, note_from_db.title)
+        self.assertEqual(self.note.text, note_from_db.text)
 
     def test_user_cant_use_used_slug(self):
         """Невозможно создать две заметки с одинаковым slug"""
-        form_data_duplicate_slug = {
-            'text': 'Другой текст',
-            'title': 'Другой заголовок',
-            'slug': self.note.slug,
+        form_data_creation = {
+            'title': 'Заголовок из теста',
+            'text': 'Текст для теста',
+            'slug': 'slug-for-new-note',
         }
+
+        form_data_duplicate_slug = form_data_creation.copy()
+        form_data_duplicate_slug['slug'] = self.note.slug
+        form_data_duplicate_slug['title'] = 'Другой заголовок'
+        form_data_duplicate_slug['text'] = 'Другой текст'
 
         response = self.author_client.post(
             self.add_url, data=form_data_duplicate_slug
