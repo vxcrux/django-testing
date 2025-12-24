@@ -21,6 +21,10 @@ class TestContent(TestCase):
             author=cls.author
         )
 
+        cls.list_url = reverse('notes:list')
+        cls.add_url = reverse('notes:add')
+        cls.edit_url = reverse('notes:edit', args=(cls.note.slug,))
+
         cls.author_client = Client()
         cls.author_client.force_login(cls.author)
 
@@ -37,11 +41,12 @@ class TestContent(TestCase):
             (self.author_client, True),
             (self.reader_client, False),
         )
-        url = reverse('notes:list')
+        url = self.list_url
         for user, value in users:
             with self.subTest(user=user):
                 object_list = user.get(url).context['object_list']
-                self.assertTrue((self.note in object_list) is value)
+                note_is_in_list = (self.note in object_list)
+                self.assertIs(note_is_in_list, value)
 
     def test_add_edit_pages_have_form(self):
         """
@@ -49,19 +54,12 @@ class TestContent(TestCase):
         передаются формы NoteForm в контексте
         """
         urls_to_check = [
-            ('notes:add', None),
-            ('notes:edit', (self.note.slug,)),
+            self.add_url,
+            self.edit_url,
         ]
 
-        self.assertIsInstance(self.author_client, Client)
-
-        for url_name, url_args in urls_to_check:
-            with self.subTest(url_name=url_name, url_args=url_args):
-
-                if url_args:
-                    current_url = reverse(url_name, args=url_args)
-                else:
-                    current_url = reverse(url_name)
+        for current_url in urls_to_check:
+            with self.subTest(current_url=current_url):
 
                 response = self.author_client.get(current_url)
                 self.assertEqual(response.status_code, HTTPStatus.OK)

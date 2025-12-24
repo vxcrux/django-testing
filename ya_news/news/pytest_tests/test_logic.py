@@ -16,6 +16,7 @@ def test_anonymous_user_cant_create_comment(
     Проверяем что POST запрос выполнен, но никакого комментария не создано
     """
     client.post(detail_url, data=comment_form_data)
+    assert Comment.objects.count() == 0
 
 
 def test_user_can_create_comment(
@@ -26,8 +27,9 @@ def test_user_can_create_comment(
     Авторизованный пользователь может отправить комментарий
     Проверяем редирект, текст, автора и новость
     """
-    response = auth_client.post(detail_url, data=comment_form_data)
-    assertRedirects(response, detail_url_with_comments)
+    assertRedirects(auth_client.post(detail_url, data=comment_form_data),
+                    detail_url_with_comments)
+    assert Comment.objects.count() == 1
     created_comment = Comment.objects.latest('created')
     assert created_comment.text == comment_form_data['text']
     assert created_comment.author == author
@@ -46,6 +48,7 @@ def test_user_cant_use_bad_words(auth_client, news, detail_url, bad_text):
     form_obj = response.context.get('form')
     assert form_obj is not None
     assertFormError(form_obj, 'text', WARNING)
+    assert Comment.objects.count() == 0
 
 
 @pytest.mark.django_db

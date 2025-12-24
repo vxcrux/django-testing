@@ -41,12 +41,7 @@ class TestNoteCreation(TestCase):
         self.assertRedirects(response, self.done_url)
         self.assertEqual(Note.objects.count(), 1)
 
-        created_note = Note.objects.get(
-            title=self.form_data_creation['title'],
-            text=self.form_data_creation['text'],
-            slug=self.form_data_creation['slug'],
-            author=self.user
-        )
+        created_note = Note.objects.first()
 
         self.assertEqual(created_note.text, 'Текст')
         self.assertEqual(created_note.title, 'Заголовок')
@@ -65,11 +60,7 @@ class TestNoteCreation(TestCase):
         self.assertRedirects(response, reverse('notes:success'))
         self.assertEqual(Note.objects.count(), 1)
 
-        new_note = Note.objects.get(
-            title=form_data_copy['title'],
-            text=form_data_copy['text'],
-            author=self.user
-        )
+        new_note = Note.objects.first()
 
         expected_slug = slugify(form_data_copy['title'])
         self.assertEqual(new_note.slug, expected_slug)
@@ -132,6 +123,8 @@ class TestNoteEditDelete(TestCase):
 
         self.assertEqual(self.note.text, self.form_data_edit['text'])
         self.assertEqual(self.note.title, self.form_data_edit['title'])
+        self.assertEqual(self.note.slug, self.form_data_edit['slug'])
+        self.assertEqual(self.note.author, self.author)
 
     def test_other_user_cant_edit_note(self):
         """Другой пользователь не может редактировать чужие заметки"""
@@ -143,16 +136,12 @@ class TestNoteEditDelete(TestCase):
         self.assertIsNotNone(note_from_db)
         self.assertEqual(self.note.title, note_from_db.title)
         self.assertEqual(self.note.text, note_from_db.text)
+        self.assertEqual(self.note.slug, note_from_db.slug)
+        self.assertEqual(self.note.author, note_from_db.author)
 
     def test_user_cant_use_used_slug(self):
         """Невозможно создать две заметки с одинаковым slug"""
-        form_data_creation = {
-            'title': 'Заголовок из теста',
-            'text': 'Текст для теста',
-            'slug': 'slug-for-new-note',
-        }
-
-        form_data_duplicate_slug = form_data_creation.copy()
+        form_data_duplicate_slug = self.form_data_edit.copy()
         form_data_duplicate_slug['slug'] = self.note.slug
         form_data_duplicate_slug['title'] = 'Другой заголовок'
         form_data_duplicate_slug['text'] = 'Другой текст'

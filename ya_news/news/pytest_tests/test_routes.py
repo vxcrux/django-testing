@@ -26,10 +26,6 @@ ANONYMOUS_CLIENT = pytest.lazy_fixture('client')
         (URL_LOGIN, ANONYMOUS_CLIENT, HTTPStatus.OK),
         (URL_SIGNUP, ANONYMOUS_CLIENT, HTTPStatus.OK),
         (URL_HOME, ANONYMOUS_CLIENT, HTTPStatus.OK),
-        (URL_COMMENT_EDIT, AUTHOR_CLIENT, HTTPStatus.OK),
-        (URL_COMMENT_EDIT, READER_CLIENT, HTTPStatus.NOT_FOUND),
-        (URL_COMMENT_DELETE, AUTHOR_CLIENT, HTTPStatus.OK),
-        (URL_COMMENT_DELETE, READER_CLIENT, HTTPStatus.NOT_FOUND)
     )
 )
 def test_pages_availability_for_different_users(
@@ -64,28 +60,25 @@ def test_logout_page_behavior_anonymous(client, url_logout):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    'url, client_fixture_name, expected_status',
+    'url, parametrized_client, expected_status',
     (
-        (URL_COMMENT_DELETE, 'auth_client', HTTPStatus.OK),
-        (URL_COMMENT_DELETE, 'reader_client', HTTPStatus.NOT_FOUND),
-        (URL_COMMENT_EDIT, 'auth_client', HTTPStatus.OK),
-        (URL_COMMENT_EDIT, 'reader_client', HTTPStatus.NOT_FOUND),
+        (URL_COMMENT_DELETE, AUTHOR_CLIENT, HTTPStatus.OK),
+        (URL_COMMENT_DELETE, READER_CLIENT, HTTPStatus.NOT_FOUND),
+        (URL_COMMENT_EDIT, AUTHOR_CLIENT, HTTPStatus.OK),
+        (URL_COMMENT_EDIT, READER_CLIENT, HTTPStatus.NOT_FOUND),
     )
 )
 def test_availability_edit_delete_for_author_and_reader(
-    request, url, client_fixture_name, expected_status, comment
+    url, parametrized_client, expected_status
 ):
     """
     Тестирует доступность страниц редактирования и удаления комментариев
     для автора (ожидаем 200) и для другого пользователя (ожидаем 302)
     """
-    parametrized_client = request.getfixturevalue(client_fixture_name)
     response = parametrized_client.get(url)
-
-    if expected_status == HTTPStatus.FOUND:
-        expected_redirect_url = f"{reverse('users:login')}?next={url}"
-        assertRedirects(response, expected_redirect_url)
-    else:
+    if expected_status == HTTPStatus.OK:
+        assert response.status_code == expected_status
+    elif expected_status == HTTPStatus.NOT_FOUND:
         assert response.status_code == expected_status
 
 
