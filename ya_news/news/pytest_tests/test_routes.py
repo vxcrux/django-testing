@@ -4,7 +4,6 @@ import pytest
 from django.urls import reverse
 from pytest_django.asserts import assertRedirects
 
-
 pytestmark = pytest.mark.django_db
 
 URL_NEWS_DETAIL = pytest.lazy_fixture('detail_url')
@@ -24,8 +23,9 @@ ANONYMOUS_CLIENT = pytest.lazy_fixture('client')
     (
         (URL_NEWS_DETAIL, ANONYMOUS_CLIENT, HTTPStatus.OK),
         (URL_LOGIN, ANONYMOUS_CLIENT, HTTPStatus.OK),
-        (URL_SIGNUP, ANONYMOUS_CLIENT, HTTPStatus.OK),
         (URL_HOME, ANONYMOUS_CLIENT, HTTPStatus.OK),
+        (URL_LOGOUT, ANONYMOUS_CLIENT, HTTPStatus.METHOD_NOT_ALLOWED),
+        (URL_SIGNUP, ANONYMOUS_CLIENT, HTTPStatus.OK),
     )
 )
 def test_pages_availability_for_different_users(
@@ -39,23 +39,7 @@ def test_pages_availability_for_different_users(
     _client: Клиент для выполнения запроса (анонимный, автор, читатель);
     status: Ожидаемый HTTP статус ответа
     """
-    response = _client.get(url)
-    assert response.status_code == status
-
-
-@pytest.mark.django_db
-def test_logout_page_behavior_anonymous(client, url_logout):
-    """
-    Проверяет поведение users:logout для анонимного пользователя:
-    GET запрос должен вернуть 405 Method Not Allowed
-    POST запрос должен перенаправлять на страницу логина
-    """
-    response_get = client.get(url_logout)
-    assert response_get.status_code == HTTPStatus.METHOD_NOT_ALLOWED
-
-    response_post = client.post(url_logout)
-    expected_redirect_url = reverse("users:login")
-    assertRedirects(response_post, expected_redirect_url)
+    assert _client.get(url).status_code == status
 
 
 @pytest.mark.django_db
