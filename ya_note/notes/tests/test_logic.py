@@ -18,6 +18,7 @@ class TestNoteCreation(TestCase):
 
         cls.add_url = reverse('notes:add')
         cls.done_url = reverse('notes:success')
+        cls.login_url = reverse('users:login')
 
         cls.form_data_creation = {
             'title': 'Заголовок',
@@ -27,9 +28,9 @@ class TestNoteCreation(TestCase):
 
     def test_anonymous_cant_create_note(self):
         """Aнонимный пользователь не может создать заметку"""
-        login_url = reverse('users:login')
-        response = self.client.post(self.add_url, data=self.form_data_creation)
-        expected_url = f'{login_url}?next={self.add_url}'
+        response = self.client.post(
+            self.add_url, data=self.form_data_creation)
+        expected_url = f'{self.login_url}?next={self.add_url}'
         self.assertRedirects(response, expected_url)
         self.assertEqual(Note.objects.count(), 0)
 
@@ -43,9 +44,9 @@ class TestNoteCreation(TestCase):
 
         created_note = Note.objects.first()
 
-        self.assertEqual(created_note.text, 'Текст')
-        self.assertEqual(created_note.title, 'Заголовок')
-        self.assertEqual(created_note.slug, 'slug1')
+        self.assertEqual(created_note.text, self.form_data_creation['text'])
+        self.assertEqual(created_note.title, self.form_data_creation['title'])
+        self.assertEqual(created_note.slug, self.form_data_creation['slug'])
         self.assertEqual(created_note.author, self.user)
 
     def test_empty_slug(self):
@@ -57,12 +58,12 @@ class TestNoteCreation(TestCase):
         form_data_copy.pop('slug')
 
         response = self.user_client.post(self.add_url, data=form_data_copy)
-        self.assertRedirects(response, reverse('notes:success'))
+        self.assertRedirects(response, self.done_url)
         self.assertEqual(Note.objects.count(), 1)
 
         new_note = Note.objects.first()
 
-        expected_slug = slugify(form_data_copy['title'])
+        expected_slug = slugify(self.form_data_creation['title'])
         self.assertEqual(new_note.slug, expected_slug)
 
 
@@ -132,19 +133,19 @@ class TestNoteEditDelete(TestCase):
             self.edit_url, data=self.form_data_edit
         )
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
-        note_from_db = Note.objects.filter(id=self.note.id).first()
-        self.assertIsNotNone(note_from_db)
-        self.assertEqual(self.note.title, note_from_db.title)
-        self.assertEqual(self.note.text, note_from_db.text)
-        self.assertEqual(self.note.slug, note_from_db.slug)
-        self.assertEqual(self.note.author, note_from_db.author)
+        note_from_db = Note.objects.get(id=self.note.id)
+        self.assertEqual(note_from_db.title, 'Оригинальный заголовок')
+        self.assertEqual(note_from_db.text, 'Оригинальный текст')
+        self.assertEqual(note_from_db.slug, 'slug2')
+        self.assertEqual(note_from_db.author, self.author)
 
     def test_user_cant_use_used_slug(self):
         """Невозможно создать две заметки с одинаковым slug"""
-        form_data_duplicate_slug = self.form_data_edit.copy()
-        form_data_duplicate_slug['slug'] = self.note.slug
-        form_data_duplicate_slug['title'] = 'Другой заголовок'
-        form_data_duplicate_slug['text'] = 'Другой текст'
+        form_data_duplicate_slug = {
+            'title': 'Другой заголовок',
+            'text': 'Другой текст',
+            'slug': self.note.slug,
+        }
 
         response = self.author_client.post(
             self.add_url, data=form_data_duplicate_slug

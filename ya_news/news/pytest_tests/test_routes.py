@@ -19,27 +19,36 @@ ANONYMOUS_CLIENT = pytest.lazy_fixture('client')
 
 
 @pytest.mark.parametrize(
-    'url, _client, status',
+    'url',
     (
-        (URL_NEWS_DETAIL, ANONYMOUS_CLIENT, HTTPStatus.OK),
-        (URL_LOGIN, ANONYMOUS_CLIENT, HTTPStatus.OK),
-        (URL_HOME, ANONYMOUS_CLIENT, HTTPStatus.OK),
-        (URL_LOGOUT, ANONYMOUS_CLIENT, HTTPStatus.METHOD_NOT_ALLOWED),
-        (URL_SIGNUP, ANONYMOUS_CLIENT, HTTPStatus.OK),
+        URL_NEWS_DETAIL,
+        URL_LOGIN,
+        URL_HOME,
+        URL_SIGNUP,
     )
 )
-def test_pages_availability_for_different_users(
-    url, _client, status
-):
+def test_pages_availability_for_anonymous_user(client, url):
     """
-    Тестирует доступность различных URL адресов для
-    разных пользователей (анонимных, авторов, читателей) по GET запросу
-    Args:
-    url: URL адрес, который нужно проверить;
-    _client: Клиент для выполнения запроса (анонимный, автор, читатель);
-    status: Ожидаемый HTTP статус ответа
+    Тестирует, что страницы (кроме выхода) доступны анонимному пользователю
+    по GET запросу, ожидая HTTPStatus.OK
     """
-    assert _client.get(url).status_code == status
+    assert client.get(url).status_code == HTTPStatus.OK
+
+
+@pytest.mark.parametrize(
+    'url, expected_status',
+    (
+        (URL_LOGOUT, HTTPStatus.FOUND),
+    )
+)
+def test_logout_behavior_for_anonymous_user(
+        client, url, expected_status):
+    """
+    Тестирует  поведение выхода URL_LOGOUT для анонимного
+    пользователя, ожидая POST-запрос и редирект
+    """
+    response = client.post(url)
+    assert response.status_code == expected_status
 
 
 @pytest.mark.django_db
@@ -57,13 +66,10 @@ def test_availability_edit_delete_for_author_and_reader(
 ):
     """
     Тестирует доступность страниц редактирования и удаления комментариев
-    для автора (ожидаем 200) и для другого пользователя (ожидаем 302)
+    для автора (ожидаем 200 OK) и для другого пользователя (ожидаем 404)
     """
     response = parametrized_client.get(url)
-    if expected_status == HTTPStatus.OK:
-        assert response.status_code == expected_status
-    elif expected_status == HTTPStatus.NOT_FOUND:
-        assert response.status_code == expected_status
+    assert response.status_code == expected_status
 
 
 @pytest.mark.django_db

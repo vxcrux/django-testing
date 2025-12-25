@@ -106,15 +106,15 @@ class TestRoutes(TestCase):
         анонимный пользователь перенаправляется на страницу логина
         """
         urls_to_check = (
-            (self.notes_list_url, None),
-            (self.notes_success_url, None),
-            (self.notes_add_url, None),
-            (self.note_detail_url, None),
-            (self.note_edit_url, None),
-            (self.note_delete_url, None),
+            self.notes_list_url,
+            self.notes_success_url,
+            self.notes_add_url,
+            self.note_detail_url,
+            self.note_edit_url,
+            self.note_delete_url,
         )
 
-        for url, args in urls_to_check:
+        for url in urls_to_check:
             with self.subTest(url=url):
                 redirect_url = f'{self.login_url}?next={url}'
                 response = self.client.get(url)
