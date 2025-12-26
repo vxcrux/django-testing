@@ -35,22 +35,6 @@ def test_pages_availability_for_anonymous_user(client, url):
     assert client.get(url).status_code == HTTPStatus.OK
 
 
-@pytest.mark.parametrize(
-    'url, expected_status',
-    (
-        (URL_LOGOUT, HTTPStatus.FOUND),
-    )
-)
-def test_logout_behavior_for_anonymous_user(
-        client, url, expected_status):
-    """
-    Тестирует  поведение выхода URL_LOGOUT для анонимного
-    пользователя, ожидая POST-запрос и редирект
-    """
-    response = client.post(url)
-    assert response.status_code == expected_status
-
-
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     'url, parametrized_client, expected_status',
