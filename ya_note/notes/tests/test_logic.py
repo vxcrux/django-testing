@@ -99,12 +99,6 @@ class TestNoteEditDelete(TestCase):
             'slug': 'slug2',
         }
 
-        cls.form_data_duplicate_slug = {
-            'title': 'Другой заголовок',
-            'text': 'Другой текст',
-            'slug': cls.note.slug,
-        }
-
     def test_author_can_delete_note(self):
         """Авторизованный пользователь может удалять свои заметки"""
         response = self.author_client.delete(self.delete_url)
@@ -136,11 +130,6 @@ class TestNoteEditDelete(TestCase):
 
     def test_other_user_cant_edit_note(self):
         """Другой пользователь не может редактировать чужие заметки"""
-        original_title = self.note.title
-        original_text = self.note.text
-        original_slug = self.note.slug
-        original_author = self.note.author
-
         response = self.reader_client.post(
             self.edit_url, data=self.form_data_edit
         )
@@ -148,21 +137,24 @@ class TestNoteEditDelete(TestCase):
 
         note_from_db = Note.objects.get(id=self.note.id)
 
-        self.assertEqual(note_from_db.title, original_title)
-        self.assertEqual(note_from_db.text, original_text)
-        self.assertEqual(note_from_db.slug, original_slug)
-        self.assertEqual(note_from_db.author, original_author)
+        self.assertEqual(note_from_db.title, self.note.title)
+        self.assertEqual(note_from_db.text, self.note.text)
+        self.assertEqual(note_from_db.slug, self.note.slug)
+        self.assertEqual(note_from_db.author, self.note.author)
 
     def test_user_cant_use_used_slug(self):
         """Невозможно создать две заметки с одинаковым slug"""
+        form_data_duplicate_slug = self.form_data_edit.copy()
+        form_data_duplicate_slug['slug'] = self.note.slug
+
         response = self.author_client.post(
-            self.add_url, data=self.form_data_duplicate_slug
+            self.add_url, data=form_data_duplicate_slug
         )
 
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
         form = response.context.get('form')
         self.assertFormError(
-            form, 'slug', self.form_data_duplicate_slug['slug'] + WARNING
+            form, 'slug', form_data_duplicate_slug['slug'] + WARNING
         )
         self.assertEqual(Note.objects.count(), 1)
